@@ -1,1 +1,123 @@
-<!DOCTYPE html><html><head><meta name="viewport" content="width=device-width,initial-scale=1"><title>3H Admin - Number Lottery</title><style>body{font-family:sans-serif;background:#111;color:#fff;padding:15px}button{width:100%;padding:14px;margin:7px 0;border:0;border-radius:10px;font-size:17px;font-weight:bold}textarea{width:100%;height:150px;border-radius:8px;padding:10px;font-size:16px}#winners{background:#222;padding:12px;border-radius:10px;margin-top:12px}</style></head><body><h2>3H Admin - Number Lottery 🎉</h2><p>Total Numbers: <b id="count">0</b></p><textarea id="names" placeholder="ہر لائن پر ایک نمبر لکھو&#10;03001234567&#10;03123456789"></textarea><button onclick="saveNames()" style="background:#2196F3;color:#fff">Save Numbers</button><hr><button style="background:#FFD700" onclick="draw(1,1)">1st Prize 5000 Rs (1)</button><button style="background:#C0C0C0" onclick="draw(2,1)">2nd Prize 2500 Rs (2)</button><button style="background:#CD7F32;color:#fff" onclick="draw(3,1)">3rd Prize 1000 Rs (5)</button><button style="background:#00c853;color:#fff" onclick="draw(4,10)">4th Prize 500 Rs (100)</button><div id="winners"></div><button onclick="resetAll()" style="background:#f44336;color:#fff">Reset</button><script>let users=JSON.parse(localStorage.getItem('3h_users')||'[]');let won=JSON.parse(localStorage.getItem('3h_won')||'[]');document.getElementById('names').value=users.join('\n');updateCount();function saveNames(){let raw=document.getElementById('names').value.split('\n').map(s=>s.trim()).filter(s=>s);let unique=[...new Set(raw)];if(raw.length!=unique.length)alert('ڈبل نمبر ہٹا دیے!');users=unique;localStorage.setItem('3h_users',JSON.stringify(users));updateCount();alert(users.length+' نمبر Save')}function updateCount(){document.getElementById('count').innerText=users.length;showWinners()}function draw(p,n){let a=users.filter(u=>!won.includes(u));if(a.length<n){alert('باقی نمبر: '+a.length);return}let s=[];for(let i=0;i<n;i++){let idx=Math.floor(Math.random()*a.length);s.push(a[idx]);a.splice(idx,1)}won=won.concat(s);localStorage.setItem('3h_won',JSON.stringify(won));showWinners();alert('Prize '+p+':\n'+s.join('\n'))}function showWinners(){document.getElementById('winners').innerHTML='<h3>Winners</h3>'+(won.length?won.map((w,i)=>(i+1)+'. '+w).join('<br>'):'کوئی ونر نہیں')}function resetAll(){if(confirm('Reset?')){won=[];localStorage.removeItem('3h_won');showWinners()}}</script></body></html>
+<!DOCTYPE html><html><head><meta name="viewport" content="width=device-width,initial-scale=1"><title>3H Admin - Firebase Number Lottery</title><style>body{font-family:sans-serif;background:#111;color:#fff;padding:15px}button{width:100%;padding:14px;margin:7px 0;border:0;border-radius:10px;font-size:17px;font-weight:bold}input{width:100%;padding:12px;border-radius:8px;margin:5px 0;box-sizing:border-box}#list,#winners{background:#222;padding:12px;border-radius:10px;margin-top:12px;max-height:250px;overflow:auto;word-break:break-all}</style></head><body>
+<h2>3H Admin - Firebase Lottery 🎉</h2>
+<p>Total Numbers in Firebase: <b id="count">Loading...</b></p>
+<input id="search" placeholder="Number search karo..." oninput="filterList()">
+<div id="list">Loading Firebase...</div>
+<hr>
+<button style="background:#FFD700" onclick="draw(1,1)">1st Prize 5000 Rs (1 Winner)</button>
+<button style="background:#C0C0C0" onclick="draw(2,1)">2nd Prize 2500 Rs (1 Winner)</button>
+<button style="background:#CD7F32;color:#fff" onclick="draw(3,1)">3rd Prize 1000 Rs (1 Winner)</button>
+<button style="background:#00c853;color:#fff" onclick="draw(4,10)">4th Prize 500 Rs (10 Winners)</button>
+<div id="winners">No winners yet</div>
+<button onclick="resetAll()" style="background:#f44336;color:#fff;margin-top:15px">Reset All Winners</button>
+
+<script type="module">
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
+import { getDatabase, ref, get, set, remove } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-database.js";
+
+const firebaseConfig = {
+  apiKey: "AIzaSyDt-ledtqtU7illD-3gtKrX70nBf4ZsOgo",
+  authDomain: "human-helping-hand.firebaseapp.com",
+  databaseURL: "https://human-helping-hand-default-rtdb.asia-southeast1.firebasedatabase.app",
+  projectId: "human-helping-hand",
+  storageBucket: "human-helping-hand.firebasestorage.app",
+  messagingSenderId: "291610402320",
+  appId: "1:291610402320:web:4ad0bc85be37ba35877495",
+  measurementId: "G-XT5CQHB47B"
+};
+
+const app = initializeApp(firebaseConfig);
+const db = getDatabase(app);
+
+let allNumbers = [];
+let allKeys = []; // to keep original keys
+let winners = [];
+
+async function loadData(){
+  try{
+    // Try users node
+    let snap = await get(ref(db, 'users'));
+    if(!snap.exists()){
+      snap = await get(ref(db, 'members'));
+    }
+    if(!snap.exists()){
+      snap = await get(ref(db, 'participants'));
+    }
+
+    allNumbers = [];
+    allKeys = [];
+    if(snap.exists()){
+      let val = snap.val();
+      for(let k in val){
+        let obj = val[k];
+        let phone = "";
+        if(typeof obj === 'string') phone = obj;
+        else if(obj.phone) phone = obj.phone;
+        else if(obj.number) phone = obj.number;
+        else if(obj.mobile) phone = obj.mobile;
+        else phone = k;
+        if(phone){
+          allNumbers.push(phone.toString().trim());
+          allKeys.push(k);
+        }
+      }
+    }
+    // Remove duplicate numbers automatically
+    let unique = [...new Set(allNumbers)];
+    if(unique.length!= allNumbers.length){
+      console.log('Duplicates removed: ' + (allNumbers.length - unique.length));
+    }
+    allNumbers = unique;
+
+    document.getElementById('count').innerText = allNumbers.length;
+    document.getElementById('list').innerHTML = allNumbers.length? allNumbers.join('<br>') : 'Firebase me koi number nahi mila. Node name check karo.';
+
+    let winSnap = await get(ref(db, 'winners'));
+    winners = [];
+    if(winSnap.exists()){
+      let wval = winSnap.val();
+      for(let k in wval){
+        winners.push(wval[k].phone || wval[k] || k);
+      }
+    }
+    showWinners();
+  }catch(e){
+    document.getElementById('list').innerHTML = 'Error: '+e.message;
+  }
+}
+
+window.filterList = ()=>{
+  let q = document.getElementById('search').value.trim();
+  let f = allNumbers.filter(n=>n.includes(q));
+  document.getElementById('list').innerHTML = f.join('<br>') + '<br><br><b>Found: '+f.length+'</b>';
+}
+
+window.showWinners = ()=>{
+  document.getElementById('winners').innerHTML = '<h3>Winners (No Duplicate)</h3>' + (winners.length? winners.map((w,i)=>(i+1)+'. '+w).join('<br>') : 'Abhi koi winner nahi');
+}
+
+window.draw = async (prize, num)=>{
+  let available = allNumbers.filter(n=>!winners.includes(n));
+  if(available.length < num){ alert('Baki numbers kam hain! Baki: '+available.length); return; }
+  let selected=[];
+  for(let i=0;i<num;i++){ let idx=Math.floor(Math.random()*available.length); selected.push(available[idx]); available.splice(idx,1); }
+
+  for(let phone of selected){
+    // save with phone as key (remove + and spaces)
+    let safeKey = phone.replace(/[^0-9]/g,'');
+    await set(ref(db, 'winners/' + safeKey), {phone: phone, prize: prize, time: Date.now()});
+  }
+  winners = winners.concat(selected);
+  showWinners();
+  alert('Prize '+prize+' Winners:\n'+selected.join('\n'));
+}
+
+window.resetAll = async ()=>{
+  if(!confirm('Sab winners Firebase se DELETE karne hain?')) return;
+  await remove(ref(db, 'winners'));
+  winners=[]; showWinners();
+  alert('Reset ho gaya');
+}
+
+loadData();
+</script></body></html>
